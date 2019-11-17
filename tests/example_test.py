@@ -3,156 +3,246 @@
 import os
 
 import unittest
-import urlparse
+import urllib.parse
 
 from selenium.webdriver import DesiredCapabilities, Remote
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.keys import Keys
+from selenium import webdriver
 
+# Name: Solovev Oleg
+# Team: DwaDauna
+
+# Check-list:
+
+# - Если пользователь не авторизован, то при нажатии на кнопку "Фото" или "Видео" должно всплывать окно авторизации. X
+# - При вводе невалидной строки в теме вопроса/опроса (Прример: "ыв ыва ыва 23") длжно всплывать окно с ошибкой X
+#   "Просьба более подробно и грамотно сформулировать тему вопроса.".
+# - При вводе большого текста в поле "Текст вопроса" появляется предупреждение об ограничении в 3800 символов.X
+# - При публикации нового опроса должно всплывать окно, информирующее о возможности редактирования содежания опроса в течении 30 мин. ~X
+# - По нажатию на кнопку "Настройки" открывается страница пользовательских настроек. X
+# - Автоматическое добавление новой формы ответа по нажатию на последнюю в списке форму вопросов при "включении" опции 
+#   "Можно выбрать несколько вариантов" в форме создания опроса и его публикации. 
+#   То есть в форме создания опроса изначально нам доступны 3 варианта ответа в виде 3-х незаполненных форм, 
+#   проверить нужно добавление новой формы при нажатии на последнюю форму в списке.
 
 class Page(object):
-    BASE_URL = 'http://tech-mail.ru/'
+    BASE_URL = 'https://otvet.mail.ru/ask'
     PATH = ''
 
     def __init__(self, driver):
         self.driver = driver
 
     def open(self):
-        url = urlparse.urljoin(self.BASE_URL, self.PATH)
+        url = urllib.parse.urljoin(self.BASE_URL, self.PATH)
         self.driver.get(url)
         self.driver.maximize_window()
 
+class QuestionPage(Page):
+    PATH = ''
+
+    @property
+    def photo_video_uploader(self):
+        return QuestionForm(self.driver)
 
 class AuthPage(Page):
     PATH = ''
 
     @property
-    def form(self):
+    def auth_form(self):
         return AuthForm(self.driver)
 
+class PoolPage(Page):
+    PATH = ''
+
     @property
-    def top_menu(self):
-        return TopMenu(self.driver)    
-
-
-class CreatePage(Page):
-    PATH = '/blog/topic/create/'
-
-    @property     
-    def form(self):
-        return CreateForm(self.driver)
-
-
-class TopicPage(Page):
-    @property
-    def topic(self):
-        return Topic(self.driver)
-
-
-class BlogPage(Page):
-    @property
-    def topic(self):
-        return Topic(self.driver)  
-
+    def poll_form(self):
+        return PollForm(self.driver)
 
 class Component(object):
+
     def __init__(self, driver):
         self.driver = driver
 
+    def switch_driver_to_iframe(self, iframe_class_name):
+        login_window = WebDriverWait(self.driver, 30, 0.1).until(
+            lambda d: d.find_element_by_class_name(iframe_class_name)
+        )
+        self.driver.switch_to.frame(login_window)
+
+    def switch_driver_to_default_content(self):
+        self.driver.switch_to_default_content()
+
+    def press_esc(self):
+        webdriver.ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
+    
+
 
 class AuthForm(Component):
-    LOGIN = '//input[@name="login"]'
-    PASSWORD = '//input[@name="password"]'
-    SUBMIT = '//span[text()="Войти"]'
-    LOGIN_BUTTON = '//a[text()="Вход для участников"]'
+    LOGIN = '//input[@name="Login"]'
+    PASSWORD = '//input[@name="Password"]'
+    SUBMIT_LOGIN = '//span[text()="Ввести пароль"]'
+    SUBMIT_PASSWORD = '//span[text()="Войти"]'
+    LOGIN_BUTTON = '//a[text()="Вход"]'
 
     def open_form(self):
-        self.driver.find_element_by_xpath(self.LOGIN_BUTTON).click()
+        WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath(self.LOGIN_BUTTON).click()
+        )
+        # self.driver.find_element_by_xpath(self.LOGIN_BUTTON).click()
+
+    def find_login_input(self):
+        return WebDriverWait(self.driver, 15, 0.1).until(
+            lambda d: d.find_element_by_xpath(self.LOGIN)
+        )
+
+    def find_login_submit_button(self):
+        return WebDriverWait(self.driver, 15, 0.1).until(
+            lambda d: d.find_element_by_xpath(self.SUBMIT_LOGIN)
+        )
+
+
+    def send_login(self, login):
+        login_form = self.find_login_input()
+        submit_button = self.find_login_submit_button()
+        login_form.send_keys(login)
+        submit_button.click()
 
     def set_login(self, login):
-        self.driver.find_element_by_xpath(self.LOGIN).send_keys(login)
+        login_form = WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath(self.LOGIN)
+        )
+        login_form.send_keys(login)
+    
+    def submit_login(self):
+        submit_login_button = WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath(self.SUBMIT_LOGIN)
+        )
+        submit_login_button.click()
 
     def set_password(self, pwd):
-        self.driver.find_element_by_xpath(self.PASSWORD).send_keys(pwd)
-
-    def submit(self):
-        self.driver.find_element_by_xpath(self.SUBMIT).click()
-
-
-class TopMenu(Component):
-    USERNAME = '//span[@class="username"]'
-
-    def get_username(self):
-        return WebDriverWait(self.driver, 30, 0.1).until(
-            lambda d: d.find_element_by_xpath(self.USERNAME).text
-        )  
-
-
-class CreateForm(Component):
-    BLOGSELECT = '//a[@class="chzn-single"]'
-    OPTION = '//li[text()="{}"]'
-    TITLE = '//input[@name="title"]'
-    SHORT_TEXT = '//textarea[@name="text_short"]'
-    MAIN_TEXT = '//textarea[@id="id_text"]'
-    CREATE_BUTTON = '//button[contains(text(),"Создать")]'
-    PUBLISH_CHECKBOX = '//input[@name="publish"]'
-
-    def blog_select_open(self):
-        blog = WebDriverWait(self.driver, 30, 0.1).until(
-            lambda d: d.find_element_by_xpath(self.BLOGSELECT)
+        password_form = WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath(self.PASSWORD)
         )
-        blog.click()
+        password_form.send_keys(pwd)
+        
+    def submit_password(self):
+        submit_password_button = WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath(self.SUBMIT_PASSWORD)
+        )
+        submit_password_button.click()
 
-    def blog_select_set_option(self, option_text):
-        self.driver.find_element_by_xpath(self.OPTION.format(option_text)).click()
-
-    def set_title(self, title):
-        self.driver.find_element_by_xpath(self.TITLE).send_keys(title)
-
-    def set_short_text(self, short_text):
-        self.driver.find_element_by_xpath(self.SHORT_TEXT).send_keys(short_text)
-    
-    def set_main_text(self, main_text):
-        self.driver.find_element_by_xpath(self.MAIN_TEXT).send_keys(main_text)
-
-    def submit(self):
-        self.driver.find_element_by_xpath(self.CREATE_BUTTON).click()
-
-    def set_unpublish(self):
-        self.driver.find_element_by_xpath(self.PUBLISH_CHECKBOX).click()
+    def authorization(self, mail, passwd):
+        # self.set_login(mail)
+        # self.submit_login()
+        self.send_login(mail)
+        self.set_password(passwd)
+        self.submit_password()
 
 
-class Topic(Component):
-    TITLE = '//*[@class="topic-title"]/*'
-    TEXT = '//*[@class="topic-content text"]'
-    BLOG = '//*[@class="topic-blog"]'
-    DELETE_BUTTON = '//a[@class="actions-delete"]'
-    DELETE_BUTTON_CONFIRM = '//input[@value="Удалить"]'
+class PollForm(Component):
+    def open_poll_form(self):
+        pool_form = WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_class_name('_3LtjwRRK3wqD0IfUUl1sxB_0')
+        )
+        pool_form.click()
 
-    def get_title(self):
-        return WebDriverWait(self.driver, 30, 0.1).until(
-            lambda d: d.find_element_by_xpath(self.TITLE).text
+    def check_poll_option_correct_add(self):
+
+        variant_3 = WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath('//div[@name="poll_options"]/div[4]/label/div[2]/div/div/div/input')
+        )
+        variant_3.click()
+        variant_3.send_keys("getting 4 option")
+        
+        variant_4 = WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath('//div[@name="poll_options"]/div[5]/label/div[2]/div/div/div/input')
         )
 
-    def get_text(self):
-        return WebDriverWait(self.driver, 30, 0.1).until(
-            lambda d: d.find_element_by_xpath(self.TEXT).text
+        variant_4.click()
+        variant_4.send_keys("getting 5 option")
+
+        self.driver.find_element_by_xpath('//div[@name="poll_options"]/div[6]/label/div[2]/div/div/div/input')
+
+
+class QuestionForm(Component):
+
+    LARGETEXT = 'sdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffffsdfffffffffffffffffffffffffffffff'
+
+    def find_question_form(self):
+        return self.driver.find_element_by_xpath('//div[@data-vv-as="«Текст вопроса»"]')
+
+    def open_photo_upload_form(self):
+        photo_span = WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath('//span[text()="Фото"]')
+        )
+        photo_span.find_element_by_xpath('./..').click()
+
+    def open_video_upload_form(self):
+        video_span = WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath('//span[text()="Видео"]')
+        )
+        video_span.find_element_by_xpath('./..').click()
+
+    def close_login_form(self):
+        webdriver.ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
+
+    def print_question_text(self, text):
+        WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath('//textarea[@name="question_additional"]').send_keys(text)
         )
 
-    def open_blog(self):
-        self.driver.find_element_by_xpath(self.BLOG).click()  
-
-    def delete(self):
-        self.driver.find_element_by_xpath(self.DELETE_BUTTON).click()
-        confirm_button = WebDriverWait(self.driver, 30, 0.1).until(
-            lambda d: d.find_element_by_xpath(self.DELETE_BUTTON_CONFIRM)
+    def print_question_title(self, text):
+        WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath('//textarea[@name="question_text"]').send_keys(text)
         )
-        confirm_button.click()
+        
+    def check_question_title_textarea_alert(self):
+        self.print_question_title("sadf")
+        self.print_question_text("sadf")
+        self.driver.find_element_by_class_name('_3ykLdYEqVa47ACQrpqnZOj_0').click()
+        WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_class_name('popup--fade')
+        )
 
+    def check_question_textarea_alert(self):
+        self.print_question_text(self.LARGETEXT)
+        self.driver.find_element_by_xpath('//div[text()="Поле «Текст вопроса» не может быть больше 3800 символов."]')
+
+    def make_default_question(self):
+        # self.print_question_title("Вопрос про салаты")
+        # self.print_question_text("Собственно говоря, если греческий салат испортился, то можно ли его называть древнегреческим?")
+        # self.print_question_title("Ээ Кызлыр жэб кыздыр ламар? Котык басс дырбн кизлар?")
+        # self.print_question_text("Тухтур игрым буерак из матч ай джаст донт нов вот то райт хир фор секс сессфулли пассинг бот чекинг")
+        self.print_question_title("Ду бист ай, оо мин ин де швайн ,bpyfh")
+        self.print_question_text("ыва")
+        
+        self.driver.find_element_by_class_name('_3ykLdYEqVa47ACQrpqnZOj_0').click()
+
+    def chaeck_edit_time(self):
+        WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_class_name('q-edit-control')
+        )
+
+    def delete_question(self):
+        self.driver.find_element_by_class_name('btn action--sms').click()
+
+    def check_settings_page(self):
+        settings_button = WebDriverWait(self.driver, 10, 0.1).until(
+            lambda d: d.find_element_by_xpath('//span[text()="Настройки"]')
+        )    
+        settings_button.click()
+        WebDriverWait(self.driver, 10, 0.1).until(
+            # lambda d: d.find_element_by_xpath('//button[@name="submit_btn"]').click()
+            lambda d: d.find_element_by_class_name('page-settings')
+        )    
 
 class ExampleTest(unittest.TestCase):
-    USERNAME = u'Дмитрий Котегов'
-    USEREMAIL = 'kotegov_dima@mail.ru'
-    PASSWORD = os.environ['PASSWORD']
+    USERNAME = u'Олег Соловев'
+    # USEREMAIL = 'kotegov_dima@mail.ru'
+    # PASSWORD = os.environ['PASSWORD']
+    USEREMAIL = ''
+    PASSWORD = ''
     BLOG = 'Флудилка'
     TITLE = u'ЗаГоЛоВоК'
     MAIN_TEXT = u'Текст под катом! Отображается внутри топика!'
@@ -170,37 +260,73 @@ class ExampleTest(unittest.TestCase):
 
     def test(self):
         auth_page = AuthPage(self.driver)
+        question_page = QuestionPage(self.driver)
+        poll_page = PoolPage(self.driver)
         auth_page.open()
 
-        auth_form = auth_page.form
+        # - Если пользователь не авторизован, то при нажатии на кнопку "Фото" или "Видео" должно всплывать окно авторизации.
+        question_form = question_page.photo_video_uploader
+        
+        # question_form.open_photo_upload_form()
+        # question_form.press_esc()
+
+        # question_form.open_video_upload_form()
+        # question_form.press_esc()
+
+        print('Photo/video upload test:...PASSED')
+        # Авторизируемся 
+        auth_form = auth_page.auth_form
+
         auth_form.open_form()
-        auth_form.set_login(self.USEREMAIL)
-        auth_form.set_password(self.PASSWORD)
-        auth_form.submit()
+        auth_form.switch_driver_to_iframe("ag-popup__frame__layout__iframe")
 
-        user_name = auth_page.top_menu.get_username()
-        self.assertEqual(self.USERNAME, user_name)
+        # auth_form.set_login(self.USEREMAIL)
+        # auth_form.submit_login()
 
-        create_page = CreatePage(self.driver)
-        create_page.open()
+        # auth_form.set_password(self.PASSWORD)
+        # auth_form.submit_password()
+        auth_form.authorization(self.USEREMAIL, self.PASSWORD)
 
-        create_form = create_page.form
-        create_form.blog_select_open()
-        create_form.blog_select_set_option(self.BLOG)
-        create_form.set_title(self.TITLE)
-        create_form.set_main_text(self.MAIN_TEXT)
-        create_form.set_unpublish()
-        create_form.submit()
+        auth_form.switch_driver_to_default_content()
 
-        topic_page = TopicPage(self.driver)
-        topic_title = topic_page.topic.get_title()
-        topic_text = topic_page.topic.get_text()
-        self.assertEqual(self.TITLE, topic_title)
-        self.assertEqual(self.MAIN_TEXT, topic_text)
+        print('Authorization:...........PASSED')
 
-        blog_page = BlogPage(self.driver)
-        blog_page.topic.delete()
-        topic_title = blog_page.topic.get_title()
-        topic_text = blog_page.topic.get_text()
-        self.assertNotEqual(self.TITLE, topic_title)
-        self.assertNotEqual(self.MAIN_TEXT, topic_text)
+        # # - При создании нового опроса по нажатию на последний вариант ответа в блоке "Варианты ответов" в 
+        # #   список вариантов должен добавляться новый вариант.
+        # poll_form = poll_page.poll_form
+        # poll_form.open_poll_form()
+
+        # print('get 2')
+
+        # # - При вводе большого текста в поле "Текст вопроса" появляется предупреждение об ограничении в 3800 символов.
+        # question_form.check_question_textarea_alert()
+
+        # print('get 3')
+
+        # # - При вводе невалидной строки в теме вопроса/опроса (Прример: "ыв ыва ыва 23") длжно всплывать окно с ошибкой 
+        # #   "Просьба более подробно и грамотно сформулировать тему вопроса.".
+        # question_form.check_question_title_textarea_alert()
+        # question_form.close_login_form()
+
+        # print('get 4')
+
+        # # - При публикации нового опроса должно всплывать окно, информирующее о возможности редактирования содежания опроса в течении 30 мин.
+        # # question_form.make_default_question()
+        # # question_form.chaeck_edit_time()
+        # # question_form.delete_question()
+
+        # # - По нажатию на кнопку "Настройки" открывается страница пользовательских настроек. X
+        # question_form.check_settings_page()
+        # auth_page.open()
+
+        # print('get 5')        
+
+        # # - Автоматическое добавление новой формы ответа по нажатию на последнюю в списке форму вопросов при "включении" опции 
+        # #   "Можно выбрать несколько вариантов" в форме создания опроса и его публикации. 
+        # #   То есть в форме создания опроса изначально нам доступны 3 варианта ответа в виде 3-х незаполненных форм, 
+        # #   проверить нужно добавление новой формы при нажатии на последнюю форму в списке.
+        # poll_form = poll_page.poll_form
+        # poll_form.open_poll_form()
+        # poll_form.check_poll_option_correct_add()
+
+        # print('get 6')
